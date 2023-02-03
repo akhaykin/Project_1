@@ -1,0 +1,80 @@
+---
+title: "DATA 607 Project 1"
+author: "Alex Khaykin"
+date: "2023-02-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r chess_data}
+chess_data <- read_lines("chess_data.txt")
+hlines <- str_which(chess_data, "^\\-+$")
+```
+
+
+```{r}
+player_dfs <- tibble()
+matches_dfs <- tibble()
+for (i in hlines[2:(length(hlines) - 1)]) {
+  line_1 <- str_trim(chess_data[i + 1]) %>%
+    str_squish() %>%
+    str_split_1("\\|")
+  
+  line_2 <- str_trim(chess_data[i + 2]) %>%
+    str_squish() %>%
+    str_split_1("\\|")
+  
+  player_number <- str_extract(line_1[1], "\\d+")
+  player_name <- str_trim(line_1[2])
+  total_points <- parse_number(line_1[3]) %>% format(., nsmall = 1)
+  opponent_numbers <- str_extract(line_1[4:10], "\\d+")
+  player_state <- str_trim(line_2[1])
+  player_pre_rating <- str_extract(line_2[2], "(?<=R\\:\\s)\\d{1,4}")
+  
+  player_df <- tibble(
+    player_number = player_number,
+    player_name = player_name,
+    total_points = total_points,
+    state = player_state,
+    pre_rating = player_pre_rating
+  )
+  
+  match_df <- tibble(
+    player_number = rep(player_number, length(opponent_numbers)),
+    round = 1:length(opponent_numbers),
+    opponent_number = opponent_numbers
+  )
+  
+  player_dfs <- bind_rows(player_dfs, player_df)
+  matches_dfs <- bind_rows(matches_dfs, match_df)
+}
+```
+
+```{r}
+avg_opp_pre_ratings <- matches_dfs %>%
+  left_join(
+    select(player_dfs, player_number, opponent_pre_rating = "pre_rating"),
+    by = c("opponent_number" = "player_number")
+  ) %>%
+  mutate(opponent_pre_rating = as.numeric(opponent_pre_rating)) %>%
+  group_by(player_number) %>%
+  summarise(
+    mean_opp_pre_rating = round(mean(opponent_pre_rating, na.rm = TRUE), 2),
+    .groups = "drop"
+  )
+```
+
+```{r}
+chess_df <- left_join(player_dfs, avg_opp_pre_ratings, by = "player_number")
+write_csv(chess_df, "Project_1_chess.csv")
+head(chess_df)
+```
+
+
+
+
+
